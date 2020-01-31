@@ -1,9 +1,7 @@
 from time import sleep, time
-from typing import Dict, Type, Callable, TypeVar, Any
+from typing import Dict, Type, Callable, TypeVar, Any, Optional
 from yamlable import YamlAble
-from directory_adapters import DirectoryAdapter, LocalDirectoryAdapter
-from config import trainingconfig
-from dataclasses import dataclass
+from .directory_adapters import DirectoryAdapter
 
 CT = TypeVar('CT', bound=YamlAble)
 
@@ -18,7 +16,8 @@ class SchedulingClient:
 
     def __init__(self,
                  directory_adapter: DirectoryAdapter,
-                 min_polling_interval: int = 10):
+                 min_polling_interval: int = 10,
+                 timeout: Optional[int] = None):
         """
         Creates a new SchedulingClient with the given directory_adapter. It will poll the planned
         directory at most every `min_polling_interval` seconds.
@@ -28,6 +27,7 @@ class SchedulingClient:
 
         self.directory = directory_adapter
         self.min_polling_interval = min_polling_interval
+        self.timeout = timeout
         self.config_consumers: Dict[Type, Callable[[Any], None]] = dict()
 
     def register_config(self,
@@ -54,13 +54,17 @@ class SchedulingClient:
         an interrupt or an unexpected exception is thrown.
         """
 
+        time_of_last_nonempty_poll = 0
+
         while True:
             # poll directory for new config files
             files = self.directory.poll_planned_directory()
 
-            last_time = time()
+            time_of_last_poll = time()
 
             if len(files) > 0:
+                time_of_last_nonempty_poll = time_of_last_poll
+
                 # check if there are actually executable configurations
                 for file in files:
 
@@ -84,27 +88,13 @@ class SchedulingClient:
             else:
                 print("nothing of interest found")
 
+            # check if we should abort
+            if self.timeout and time() - time_of_last_nonempty_poll > self.timeout:
+                print("Timeout!")
+                return
+
             # check if we should poll again
-            time_delta = self.min_polling_interval - (time() - last_time)
+            time_delta = self.min_polling_interval - (time() - time_of_last_poll)
             if time_delta > 0:
                 print("waiting", time_delta, "secs")
                 sleep(time_delta)
-
-
-@trainingconfig
-@dataclass
-class ConfigContainer:
-    template_name: str
-    template_config: Any
-
-
-if __name__ == "__main__":
-    sc = SchedulingClient(directory_adapter=LocalDirectoryAdapter("test"))
-
-    def consumer(config):
-        print("run")
-        sleep(3)
-        print("end")
-
-    sc.register_config(config_class=ConfigContainer, consumer_fn=consumer)
-    sc.run()
