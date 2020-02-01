@@ -1,0 +1,5 @@
+.mypy_cache/**
+.tox/**
+htmlcov/**
+.coverage
+.dmypy.json
