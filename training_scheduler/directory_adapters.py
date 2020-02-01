@@ -15,26 +15,44 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
 
     @abstractmethod
     def poll_planned_directory(self) -> List[IdentifierT]:
+        """
+        Check the planned directory for valid configs and return their unique identifier.
+        :return: A list of identifiers of all configs found.
+        """
         pass
 
     @abstractmethod
     def get_config(self, identifier: IdentifierT) -> Union[Type, None]:
+        """
+        Get the config by its unique identifier. The identifiers can be retrieved with `poll_planned_directory`.
+        :param identifier: The unqiue identifier too get the config from.
+        :return: An instance of the class associated with the yaml tag of that config.
+        """
         pass
 
     @abstractmethod
     def get_output_path(self, identifier: IdentifierT) -> Union[os.PathLike, str]:
+        # TODO maybe this is not abstract enough. We should e.g. provide a file like object instead of a path.
         pass
 
     @abstractmethod
-    def move_to_active_directory(self, identifier: IdentifierT):
+    def move_to_active_directory(self, identifier: IdentifierT) -> None:
+        """
+        Moves a config given by its `identifier` into the active directory to mark it as currently being processed.
+        :param identifier: The identifier of the config to be moved.
+        """
         pass
 
     @abstractmethod
-    def move_to_completed_directory(self, identifier: IdentifierT):
+    def move_to_completed_directory(self, identifier: IdentifierT) -> None:
+        """
+        Move a config given by its `identifier` from the active directory into the completed directory.
+        :param identifier: The identifier of the config to be moved.
+        """
         pass
 
 
-def move_to_dir(file: Union[os.PathLike, str], dir: Union[os.PathLike, str]):
+def _move_to_dir(file: Union[os.PathLike, str], dir: Union[os.PathLike, str]):
     basename = os.path.basename(file)
     assert os.path.isdir(dir)
     os.rename(file, os.path.join(dir, basename))
@@ -70,11 +88,11 @@ class LocalDirectoryAdapter(DirectoryAdapter[Text]):
         raise FileNotFoundError
 
     def move_to_active_directory(self, identifier: Text):
-        move_to_dir(os.path.join(self.planned_dir, identifier), self.active_dir)
+        _move_to_dir(os.path.join(self.planned_dir, identifier), self.active_dir)
 
     def move_to_completed_directory(self, identifier: Text):
         out_path = self.get_output_path(identifier)
         if os.path.exists(out_path):
-            move_to_dir(out_path, self.completed_dir)
+            _move_to_dir(out_path, self.completed_dir)
 
-        move_to_dir(os.path.join(self.active_dir, identifier), self.completed_dir)
+        _move_to_dir(os.path.join(self.active_dir, identifier), self.completed_dir)
