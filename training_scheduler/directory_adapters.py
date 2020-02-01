@@ -52,7 +52,12 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
         pass
 
 
-def _move_to_dir(file: Union[os.PathLike, str], dir: Union[os.PathLike, str]):
+def _move_to_dir(file: Union[os.PathLike, str], dir: Union[os.PathLike, str]) -> None:
+    """
+    Move `file` into directory `dir`.
+    :param file: The path of the file.
+    :param dir: The path of the target directory.
+    """
     basename = os.path.basename(file)
     assert os.path.isdir(dir)
     os.rename(file, os.path.join(dir, basename))
