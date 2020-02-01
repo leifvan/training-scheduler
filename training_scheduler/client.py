@@ -79,7 +79,10 @@ class SchedulingClient:
                         self.directory.move_to_active_directory(file)
 
                         # run consumer
-                        self.config_consumers[type(config)](config)
+                        try:
+                            self.config_consumers[type(config)](config)
+                        except Exception as e:
+                            print("Failed run because of",e)
 
                         # complete execution
                         self.directory.move_to_completed_directory(file)
