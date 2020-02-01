@@ -1,8 +1,9 @@
 from docstr_coverage import get_docstring_coverage
+from typing import List, Union
 import os
 
 # collect files
-files = []
+files: List[Union[os.PathLike, str]] = []
 for dirpath, _, filenames in os.walk('training_scheduler'):
     files.extend(os.path.join(dirpath, name) for name in filenames if name.endswith('.py'))
 
