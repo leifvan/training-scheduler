@@ -8,5 +8,6 @@ setup(
     license='Unlicense',
     author='Leif Van Holland',
     author_email='',
-    description=''
+    description='',
+    install_requires=["pyyaml", "yamlable"]
 )
