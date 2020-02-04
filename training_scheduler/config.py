@@ -77,4 +77,5 @@ def trainingconfig(cls: type):
     of the decorated class. The corresponding yaml tag will be ``!trainingconfig/[classname]``.
     """
     ConfigCodec.register_type(cls, cls.__name__)
+    ConfigCodec.register_with_pyyaml()
     return cls

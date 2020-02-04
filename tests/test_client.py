@@ -1,6 +1,7 @@
 import unittest
 import os
 import shutil
+from typing import Optional
 from time import sleep
 from dataclasses import dataclass
 from training_scheduler.config import trainingconfig
@@ -11,7 +12,7 @@ from training_scheduler.directory_adapters import LocalDirectoryAdapter
 @trainingconfig
 @dataclass
 class _TestConfig:
-    test_string: str = None
+    test_string: Optional[str] = None
 
 
 def _consumer(config: _TestConfig):
