@@ -1,7 +1,8 @@
+import json
 from time import sleep, time
 from typing import Dict, Type, Callable, TypeVar, Any, Optional
 from yamlable import YamlAble
-from .directory_adapters import DirectoryAdapter
+from .directory_adapters import DirectoryAdapter, ConfigState
 
 CT = TypeVar('CT', bound=YamlAble)
 
@@ -20,7 +21,7 @@ class SchedulingClient:
                  timeout: Optional[int] = None):
         """
         Creates a new SchedulingClient with the given directory_adapter. It will poll the planned
-        directory at most every `min_polling_interval` seconds.
+        directory at most every ``min_polling_interval`` seconds.
         :param directory_adapter: A subclass of DirectoryAdapter.
         :param min_polling_interval: Minimum number of seconds between polling attempts.
         """
@@ -28,19 +29,21 @@ class SchedulingClient:
         self.directory = directory_adapter
         self.min_polling_interval = min_polling_interval
         self.timeout = timeout
-        self.config_consumers: Dict[Type, Callable[[Any], None]] = dict()
+        self.config_consumers: Dict[Type, Callable[[Any], Any]] = dict()
 
     def register_config(self,
                         config_class: Type,
-                        consumer_fn: Callable[[Any], None]):
+                        consumer_fn: Callable[[Any], Any]):
         """
         Registers a consumer for a given type of config. The config has to be defined by a config class
         decorated with @config.trainingconfig. The yaml decoder will then look for a config file with
-        tag `!trainingconfig/classname`, where classname is the name of the config class. If a config
-        with this tag is found, the given `consumer_fn` will be called, passing the config as the
-        first parameter.
-        :param config_class: The class to be consumed by `consumer_fn`.
-        :param consumer_fn: A function that consumes configs of type `config_class`.
+        tag ``!trainingconfig/classname``, where classname is the name of the config class. If a config
+        with this tag is found, the given ``consumer_fn`` will be called, passing the config as the
+        first parameter. The return value of ``consumer_fn`` will be parsed with ``json.dump`` and saved
+        alongside the config file in the ``completed_runs`` directory.
+        :param config_class: The class to be consumed by ``consumer_fn``.
+        :param consumer_fn: A function that consumes configs of type ``config_class`` and possibly returns
+        a json-serializable result object.
         """
 
         if config_class in self.config_consumers:
@@ -58,7 +61,7 @@ class SchedulingClient:
 
         while True:
             # poll directory for new config files
-            files = self.directory.poll_planned_directory()
+            files = self.directory.poll()
 
             time_of_last_poll = time()
 
@@ -76,16 +79,23 @@ class SchedulingClient:
                     # check if there is a consumer for this config
                     if config and type(config) in self.config_consumers:
                         # move config to active folder
-                        self.directory.move_to_active_directory(file)
+                        self.directory.change_state(file, ConfigState.active)
 
                         # run consumer
+                        # TODO maybe the consumers should be run in a separate process to protect from memory leaks
                         try:
-                            self.config_consumers[type(config)](config)
+                            result = self.config_consumers[type(config)](config)
                         except Exception as e:
-                            print("Failed run because of",e)
+                            print("Failed run because of", type(e), e)
+
+                        try:
+                            if result is not None:
+                                self.directory.write_output(file, json.dumps(result))
+                        except Exception as e:
+                            print("Failed to write output because of", type(e), e)
 
                         # complete execution
-                        self.directory.move_to_completed_directory(file)
+                        self.directory.change_state(file, ConfigState.completed)
                     else:
                         print("can't do anything with", file)
             else:

@@ -10,9 +10,9 @@ class ConfigCodec(YamlCodec):
     @classmethod
     def register_type(cls, typ, tag):
         """
-        Register a class `typ` as yamlable with the given `tag`. PyYaml will then look for tags in the yaml
-        containing the tag `!trainingconfig/[tag]` and parse it into the given `typ`. Instead of registering via
-        this function, you can use the `trainingconfig` decorator.
+        Register a class ``typ`` as yamlable with the given ``tag``. PyYaml will then look for tags in the yaml
+        containing the tag ``!trainingconfig/[tag]`` and parse it into the given ``typ``. Instead of registering via
+        this function, you can use the ``trainingconfig`` decorator.
         :param typ: The class that the yaml will be parsed into.
         :param tag: The tag that will be associated with the given class.
         """
@@ -22,7 +22,7 @@ class ConfigCodec(YamlCodec):
     @classmethod
     def get_yaml_prefix(cls):
         """
-        Returns the tag prefix `!trainingconfig/`.
+        Returns the tag prefix ``!trainingconfig/``.
         :return: The prefix for all training config tags.
         """
         return "!trainingconfig/"  # This is our root yaml tag
@@ -52,7 +52,7 @@ class ConfigCodec(YamlCodec):
         Create an object corresponding to the given tag, from the decoded dict.
         :param yaml_tag_suffix: The given tag.
         :param dct: The dictionary to populate the associated class instance with.
-        :return: An instance of the class associated with the given tag, containing data from `dct`.
+        :return: An instance of the class associated with the given tag, containing data from ``dct``.
         """
         typ = cls.yaml_tags_to_types[yaml_tag_suffix]
         return typ(**dct)
@@ -62,8 +62,8 @@ class ConfigCodec(YamlCodec):
         """
         Encode the given object and also return the tag that it should have
         :param obj: The object to encode.
-        :return: A tuple `(tag, dct)` containing the `tag` associated with the type of the given object and a dictionary
-        `dct` that can be parsed into a yaml.
+        :return: A tuple ``(tag, dct)`` containing the ``tag`` associated with the type of the given object and a dictionary
+        ``dct`` that can be parsed into a yaml.
         """
         return cls.types_to_yaml_tags[type(obj)], vars(obj)
 
@@ -74,7 +74,7 @@ ConfigCodec.register_with_pyyaml()
 def trainingconfig(cls: type):
     """
     A decorator that registers the decorated class in yamlable, so that PyYaml automatically parses it into an instance
-    of the decorated class. The corresponding yaml tag will be `!trainingconfig/[classname]`.
+    of the decorated class. The corresponding yaml tag will be ``!trainingconfig/[classname]``.
     """
     ConfigCodec.register_type(cls, cls.__name__)
     return cls
