@@ -18,7 +18,6 @@ class ConfigCodec(YamlCodec):
         """
         cls.types_to_yaml_tags[typ] = tag
         cls.yaml_tags_to_types[tag] = typ
-        print("got my new type", typ, tag)
 
     @classmethod
     def get_yaml_prefix(cls):

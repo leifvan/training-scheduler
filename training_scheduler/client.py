@@ -89,7 +89,7 @@ class SchedulingClient:
                     else:
                         print("can't do anything with", file)
             else:
-                print("nothing of interest found")
+                print("no consumable config found")
 
             # check if we should abort
             if self.timeout and time() - time_of_last_nonempty_poll > self.timeout:
