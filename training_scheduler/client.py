@@ -85,14 +85,13 @@ class SchedulingClient:
                         # TODO maybe the consumers should be run in a separate process to protect from memory leaks
                         try:
                             result = self.config_consumers[type(config)](config)
+                            try:
+                                if result is not None:
+                                    self.directory.write_output(file, json.dumps(result))
+                            except Exception as e:
+                                print("Failed to write output because of", type(e), e)
                         except Exception as e:
                             print("Failed run because of", type(e), e)
-
-                        try:
-                            if result is not None:
-                                self.directory.write_output(file, json.dumps(result))
-                        except Exception as e:
-                            print("Failed to write output because of", type(e), e)
 
                         # complete execution
                         self.directory.change_state(file, ConfigState.completed)
