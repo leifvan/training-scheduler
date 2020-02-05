@@ -51,7 +51,7 @@ class SchedulingClient:
 
         self.config_consumers[config_class] = consumer_fn
 
-    def run(self):
+    def run(self, debug=False):
         """
         Starts the execution loop of this instance. It will run until the script is aborted with
         an interrupt or an unexpected exception is thrown.
@@ -88,10 +88,14 @@ class SchedulingClient:
                             try:
                                 if result is not None:
                                     self.directory.write_output(file, json.dumps(result))
+
                             except Exception as e:
                                 print("Failed to write output because of", type(e), e)
+                                if debug: raise e
+
                         except Exception as e:
                             print("Failed run because of", type(e), e)
+                            if debug: raise e
 
                         # complete execution
                         self.directory.change_state(file, ConfigState.completed)

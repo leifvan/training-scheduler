@@ -9,20 +9,6 @@ from training_scheduler.client import SchedulingClient
 from training_scheduler.directory_adapters import LocalDirectoryAdapter
 
 
-@trainingconfig
-@dataclass
-class _TestConfig:
-    test_string: Optional[str] = None
-
-
-def _consumer(config: _TestConfig):
-    print("run")
-    sleep(3)
-    print("end")
-    if config.test_string is not None:
-        return config.test_string
-
-
 class TestSchedulingClient(unittest.TestCase):
     def setUp(self) -> None:
         self.planned_run_dir = os.path.join("test_dir", "planned")
@@ -31,13 +17,24 @@ class TestSchedulingClient(unittest.TestCase):
         self.sc = SchedulingClient(directory_adapter=LocalDirectoryAdapter("test_dir"),
                                    timeout=5)
 
-        self.sc.register_config(config_class=_TestConfig, consumer_fn=_consumer)
-
     def tearDown(self) -> None:
         shutil.rmtree("test_dir")
 
     def test_client_parses_config_without_output(self):
-        data = "!trainingconfig/_TestConfig\ntest_string: null\n"
+        @trainingconfig
+        @dataclass
+        class TestConfigEmpty:
+            test_string: Optional[str] = None
+
+        def consumer(config: TestConfigEmpty):
+            self.assertEqual(type(config), TestConfigEmpty)
+            print("run")
+            sleep(3)
+            print("end")
+
+        self.sc.register_config(config_class=TestConfigEmpty, consumer_fn=consumer)
+
+        data = "!trainingconfig/TestConfigEmpty\ntest_string: null\n"
 
         with open(os.path.join(self.planned_run_dir, 'test_config_empty.yaml'), 'w') as file:
             file.write(data)
@@ -51,7 +48,20 @@ class TestSchedulingClient(unittest.TestCase):
                                                      "test_config_empty.yaml.out")))
 
     def test_client_parses_config_with_output(self):
-        data = "!trainingconfig/_TestConfig\ntest_string: Some string for testing.\n"
+        @trainingconfig
+        @dataclass
+        class TestConfigOutput:
+            test_string: Optional[str] = None
+
+        def consumer(config: TestConfigOutput):
+            print("run")
+            sleep(3)
+            print("end")
+            return config.test_string
+
+        self.sc.register_config(config_class=TestConfigOutput, consumer_fn=consumer)
+
+        data = "!trainingconfig/TestConfigOutput\ntest_string: Some string for testing.\n"
 
         with open(os.path.join(self.planned_run_dir, 'test_config_output.yaml'), 'w') as file:
             file.write(data)
@@ -64,6 +74,28 @@ class TestSchedulingClient(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join("test_dir",
                                                     "completed",
                                                     "test_config_output.yaml.out")))
+
+    def test_if_exception_is_reraised_in_debug_mode(self):
+        @trainingconfig
+        @dataclass
+        class TestConfigForDebug:
+            test_string: Optional[str] = None
+
+        def consumer(config: TestConfigForDebug):
+            print("run")
+            sleep(3)
+            print("raise")
+            raise Exception("Some test problem.")
+
+        self.sc.register_config(config_class=TestConfigForDebug, consumer_fn=consumer)
+
+        data = "!trainingconfig/TestConfigForDebug\ntest_string: null\n"
+
+        with open(os.path.join(self.planned_run_dir, 'test_config_for_debug.yaml'), 'w') as file:
+            file.write(data)
+
+        with self.assertRaises(expected_exception=Exception):
+            self.sc.run(debug=True)
 
 
 if __name__ == '__main__':
