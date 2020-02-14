@@ -1,10 +1,11 @@
 import json
 from time import sleep, time
-from typing import Dict, Type, Callable, TypeVar, Any, Optional
+from typing import Dict, Type, Callable, Any, Optional
 from yamlable import YamlAble
 from .directory_adapters import DirectoryAdapter, ConfigState
 
-CT = TypeVar('CT', bound=YamlAble)
+
+ConsumerCallbackType = Callable[[YamlAble, str], Any]
 
 
 class SchedulingClient:
@@ -29,11 +30,11 @@ class SchedulingClient:
         self.directory = directory_adapter
         self.min_polling_interval = min_polling_interval
         self.timeout = timeout
-        self.config_consumers: Dict[Type, Callable[[Any], Any]] = dict()
+        self.config_consumers: Dict[Type, ConsumerCallbackType] = dict()
 
     def register_config(self,
                         config_class: Type,
-                        consumer_fn: Callable[[Any], Any]):
+                        consumer_fn: ConsumerCallbackType):
         """
         Registers a consumer for a given type of config. The config has to be defined by a config class
         decorated with @config.trainingconfig. The yaml decoder will then look for a config file with
@@ -61,33 +62,33 @@ class SchedulingClient:
 
         while True:
             # poll directory for new config files
-            files = self.directory.poll()
+            identifiers = self.directory.poll()
 
             time_of_last_poll = time()
 
-            if len(files) > 0:
+            if len(identifiers) > 0:
                 time_of_last_nonempty_poll = time_of_last_poll
 
                 # check if there are actually executable configurations
-                for file in files:
+                for identifier in identifiers:
 
                     # read config
-                    config = self.directory.get_config(file)
+                    config = self.directory.get_config(identifier)
 
                     print("loaded config:", config)
 
                     # check if there is a consumer for this config
                     if config and type(config) in self.config_consumers:
                         # move config to active folder
-                        self.directory.change_state(file, ConfigState.active)
+                        self.directory.change_state(identifier, ConfigState.active)
 
                         # run consumer
                         # TODO maybe the consumers should be run in a separate process to protect from memory leaks
                         try:
-                            result = self.config_consumers[type(config)](config)
+                            result = self.config_consumers[type(config)](config, identifier)
                             try:
                                 if result is not None:
-                                    self.directory.write_output(file, json.dumps(result))
+                                    self.directory.write_output(identifier, json.dumps(result))
 
                             except Exception as e:
                                 print("Failed to write output because of", type(e), e)
@@ -98,9 +99,9 @@ class SchedulingClient:
                             if debug: raise e
 
                         # complete execution
-                        self.directory.change_state(file, ConfigState.completed)
+                        self.directory.change_state(identifier, ConfigState.completed)
                     else:
-                        print("can't do anything with", file)
+                        print("can't do anything with", identifier)
             else:
                 print("no consumable config found")
 

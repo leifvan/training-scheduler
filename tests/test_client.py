@@ -26,7 +26,7 @@ class TestSchedulingClient(unittest.TestCase):
         class TestConfigEmpty:
             test_string: Optional[str] = None
 
-        def consumer(config: TestConfigEmpty):
+        def consumer(config: TestConfigEmpty, identifier: str):
             self.assertEqual(type(config), TestConfigEmpty)
             print("run")
             sleep(3)
@@ -39,7 +39,7 @@ class TestSchedulingClient(unittest.TestCase):
         with open(os.path.join(self.planned_run_dir, 'test_config_empty.yaml'), 'w') as file:
             file.write(data)
 
-        self.sc.run()
+        self.sc.run(debug=True)
         self.assertTrue(os.path.isfile(os.path.join("test_dir",
                                                     "completed",
                                                     "test_config_empty.yaml")))
@@ -53,7 +53,7 @@ class TestSchedulingClient(unittest.TestCase):
         class TestConfigOutput:
             test_string: Optional[str] = None
 
-        def consumer(config: TestConfigOutput):
+        def consumer(config: TestConfigOutput, identifier: str):
             print("run")
             sleep(3)
             print("end")
@@ -66,7 +66,7 @@ class TestSchedulingClient(unittest.TestCase):
         with open(os.path.join(self.planned_run_dir, 'test_config_output.yaml'), 'w') as file:
             file.write(data)
 
-        self.sc.run()
+        self.sc.run(debug=True)
         self.assertTrue(os.path.isfile(os.path.join("test_dir",
                                                     "completed",
                                                     "test_config_output.yaml")))
@@ -81,7 +81,7 @@ class TestSchedulingClient(unittest.TestCase):
         class TestConfigForDebug:
             test_string: Optional[str] = None
 
-        def consumer(config: TestConfigForDebug):
+        def consumer(config: TestConfigForDebug, identifier: str):
             print("run")
             sleep(3)
             print("raise")

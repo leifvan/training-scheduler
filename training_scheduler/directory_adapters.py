@@ -4,12 +4,10 @@ from typing import List, Union, Hashable, Generic, TypeVar, Type, Dict
 import yaml
 from enum import Enum
 
-IdentifierT = TypeVar('IdentifierT', bound=Hashable)
-
 ConfigState = Enum("ConfigState", "planned active completed")
 
 
-class DirectoryAdapter(ABC, Generic[IdentifierT]):
+class DirectoryAdapter(ABC):
     """
     Abstract base class for all directory adapters. Every directory adapter must implement
     polling of new planned configurations, moving them into the active / completed state and
@@ -17,9 +15,9 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
     """
 
     def __init__(self):
-        self.identifier_states: Dict[IdentifierT, ConfigState] = dict()
+        self.identifier_states: Dict[str, ConfigState] = dict()
 
-    def _add_identifier(self, identifier: IdentifierT) -> None:
+    def _add_identifier(self, identifier: str) -> None:
         """
         Adds ``identifier`` to the internal bookkeeping for identifiers. It will ensure that
         - every identifier is unique
@@ -30,7 +28,7 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
         if identifier not in self.identifier_states:
             self.identifier_states[identifier] = ConfigState.planned
 
-    def change_state(self, identifier: IdentifierT, next_state: ConfigState) -> None:
+    def change_state(self, identifier: str, next_state: ConfigState) -> None:
         """
         Changes the state of the config with the given ``identifier`` to ``next_state``.
 
@@ -43,7 +41,7 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
         self.identifier_states[identifier] = next_state
 
     @abstractmethod
-    def _move_to_state(self, identifier: IdentifierT, old_state: ConfigState, new_state: ConfigState):
+    def _move_to_state(self, identifier: str, old_state: ConfigState, new_state: ConfigState):
         """
 
 
@@ -55,7 +53,7 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
         pass
 
     @abstractmethod
-    def poll(self) -> List[IdentifierT]:
+    def poll(self) -> List[str]:
         """
         Check the planned directory for valid configs and return their unique identifier.
         :return: A list of identifiers of all configs found.
@@ -63,7 +61,7 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
         pass
 
     @abstractmethod
-    def get_config(self, identifier: IdentifierT) -> Union[Type, None]:
+    def get_config(self, identifier: str) -> Union[Type, None]:
         """
         Get the config by its unique identifier. The identifiers can be retrieved with ``poll_planned_directory``.
         :param identifier: The unqiue identifier too get the config from.
@@ -72,7 +70,7 @@ class DirectoryAdapter(ABC, Generic[IdentifierT]):
         pass
 
     @abstractmethod
-    def write_output(self, identifier: IdentifierT, output: str) -> None:
+    def write_output(self, identifier: str, output: str) -> None:
         """
         Writes ``output`` in the output file corresponding to ``identifier``.
 
@@ -95,7 +93,7 @@ def _move_to_dir(file: Union[os.PathLike, str], dir: Union[os.PathLike, str]) ->
     os.rename(file, os.path.join(dir, basename))
 
 
-class LocalDirectoryAdapter(DirectoryAdapter[str]):
+class LocalDirectoryAdapter(DirectoryAdapter):
     def __init__(self, base_dir: Union[str, os.PathLike]):
         super(LocalDirectoryAdapter, self).__init__()
         self.base_dir = base_dir
