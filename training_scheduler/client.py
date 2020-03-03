@@ -114,7 +114,7 @@ class SchedulingClient:
                  directory_adapter: DirectoryAdapter,
                  min_polling_interval: int = 10,
                  timeout: Optional[int] = None,
-                 callback: SchedulingClientCallback = DefaultSchedulingClientCallback()):
+                 callback: Optional[SchedulingClientCallback] = DefaultSchedulingClientCallback()):
         """
         Creates a new SchedulingClient with the given directory_adapter. It will poll the planned
         directory at most every ``min_polling_interval`` seconds.
@@ -125,7 +125,7 @@ class SchedulingClient:
         self.directory = directory_adapter
         self.min_polling_interval = min_polling_interval
         self.timeout = timeout
-        self.callback = callback
+        self.callback = SchedulingClientCallback if callback is None else callback
 
         self.config_consumers: Dict[Type, ConsumerCallbackType] = dict()
 
