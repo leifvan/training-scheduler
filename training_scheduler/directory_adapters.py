@@ -1,10 +1,11 @@
 import os
 from abc import ABC, abstractmethod
-from typing import List, Union, Hashable, Generic, TypeVar, Type, Dict
+from typing import List, Union, Hashable, Generic, TypeVar, Type, Dict, Any
 import yaml
 from enum import Enum
 
 ConfigState = Enum("ConfigState", "planned active completed")
+ConfigType = Any
 
 
 class DirectoryAdapter(ABC):
@@ -61,7 +62,7 @@ class DirectoryAdapter(ABC):
         pass
 
     @abstractmethod
-    def get_config(self, identifier: str) -> Union[Type, None]:
+    def get_config(self, identifier: str) -> ConfigType:
         """
         Get the config by its unique identifier. The identifiers can be retrieved with ``poll_planned_directory``.
         :param identifier: The unqiue identifier too get the config from.

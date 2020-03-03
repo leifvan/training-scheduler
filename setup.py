@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='training-scheduler',
-    version='0.0.5',
+    version='0.0.6',
     packages=['training_scheduler', 'training_scheduler.examples'],
     url='',
     license='Unlicense',

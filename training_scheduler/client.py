@@ -2,10 +2,104 @@ import json
 from time import sleep, time
 from typing import Dict, Type, Callable, Any, Optional
 from yamlable import YamlAble
-from .directory_adapters import DirectoryAdapter, ConfigState
-
+from .directory_adapters import DirectoryAdapter, ConfigState, ConfigType
+from abc import abstractmethod, ABC
 
 ConsumerCallbackType = Callable[[YamlAble, str], Any]
+
+
+class SchedulingClientCallback:
+    """
+    The SchedulingClientCallback provides an interface to react to common events occurring in
+    the run process of the SchedulingClient.
+    """
+
+    def on_config_loaded(self, identifier: str, config: ConfigType) -> None:
+        """
+        Fired when a config file was loaded succesfully.
+        :param identifier: The identifier of the config.
+        :param config: The config object.
+        """
+        ...
+
+    def on_failed_to_write_result(self, identifier: str, config: ConfigType,
+                                  results: Optional[dict], exception: Exception) -> None:
+        """
+        Fired when an exception occurs while writing the results of the config consumer.
+        :param identifier: The identifier of the config.
+        :param config: The config object.
+        :param results: The output of the registered config consumer.
+        :param exception: The exception caught while writing.
+        """
+        ...
+
+    def on_failed_to_run_config(self, identifier: str, config: ConfigType,
+                                exception: Exception) -> None:
+        """
+        Fired when an exception occurs while running the config consumer for ``config``.
+        :param identifier: The identifier of the config.
+        :param config: The config object.
+        :param exception: The exception caught while running.
+        """
+        ...
+
+    def on_unregistered_config(self, identifier: str, config: ConfigType) -> None:
+        """
+        Fired when a config was found that has no registered consumer.
+        :param identifier: The identifier of the config.
+        :param config: The config object.
+        """
+        ...
+
+    def on_no_configs_found(self) -> None:
+        """
+        Fired when no config were found in the last poll.
+        """
+        ...
+
+    def on_waiting_for_next_poll(self, delta: float) -> None:
+        """
+        Fired when there is still time between the last polling attempt and the next one and the
+        run loop is about to sleep for ``delta`` seconds.
+        :param delta: The time in seconds until the next poll will be attempted.
+        """
+        ...
+
+    def on_timeout(self):
+        """
+        Fired when the run loop is about to be exited because of the preset timeout.
+        """
+        ...
+
+
+class DefaultSchedulingClientCallback(SchedulingClientCallback):
+    """
+    An exemplary implementation of ``SchedulingClientCallback`` that prints some debug info for each
+    event.
+    """
+
+    def on_config_loaded(self, identifier: str, config: ConfigType) -> None:
+        print("loaded config:", config)
+
+    def on_failed_to_write_result(self, identifier: str, config: ConfigType,
+                                  results: Optional[dict], exception: Exception) -> None:
+        print("Failed to write results because of", type(exception), exception)
+
+    def on_failed_to_run_config(self, identifier: str, config: ConfigType,
+                                exception: Exception) -> None:
+        print("Failed run because of", type(exception), exception)
+
+    def on_unregistered_config(self, identifier: str, config: ConfigType) -> None:
+        print("can't do anything with", identifier)
+
+    def on_no_configs_found(self) -> None:
+        print("no consumable config found")
+
+    def on_waiting_for_next_poll(self, delta: float) -> None:
+        print("waiting", delta, "secs")
+
+    def on_timeout(self):
+        print("Timeout!")
 
 
 class SchedulingClient:
@@ -19,7 +113,8 @@ class SchedulingClient:
     def __init__(self,
                  directory_adapter: DirectoryAdapter,
                  min_polling_interval: int = 10,
-                 timeout: Optional[int] = None):
+                 timeout: Optional[int] = None,
+                 callback: SchedulingClientCallback = DefaultSchedulingClientCallback()):
         """
         Creates a new SchedulingClient with the given directory_adapter. It will poll the planned
         directory at most every ``min_polling_interval`` seconds.
@@ -30,6 +125,8 @@ class SchedulingClient:
         self.directory = directory_adapter
         self.min_polling_interval = min_polling_interval
         self.timeout = timeout
+        self.callback = callback
+
         self.config_consumers: Dict[Type, ConsumerCallbackType] = dict()
 
     def register_config(self,
@@ -75,7 +172,7 @@ class SchedulingClient:
                     # read config
                     config = self.directory.get_config(identifier)
 
-                    print("loaded config:", config)
+                    self.callback.on_config_loaded(identifier, config)
 
                     # check if there is a consumer for this config
                     if config and type(config) in self.config_consumers:
@@ -91,27 +188,27 @@ class SchedulingClient:
                                     self.directory.write_output(identifier, json.dumps(result))
 
                             except Exception as e:
-                                print("Failed to write output because of", type(e), e)
+                                self.callback.on_failed_to_write_result(identifier, config, result, e)
                                 if debug: raise e
 
                         except Exception as e:
-                            print("Failed run because of", type(e), e)
+                            self.callback.on_failed_to_run_config(identifier, config, e)
                             if debug: raise e
 
                         # complete execution
                         self.directory.change_state(identifier, ConfigState.completed)
                     else:
-                        print("can't do anything with", identifier)
+                        self.callback.on_unregistered_config(identifier, config)
             else:
-                print("no consumable config found")
+                self.callback.on_no_configs_found()
 
             # check if we should abort
             if self.timeout and time() - time_of_last_nonempty_poll > self.timeout:
-                print("Timeout!")
+                self.callback.on_timeout()
                 return
 
             # check if we should poll again
             time_delta = self.min_polling_interval - (time() - time_of_last_poll)
             if time_delta > 0:
-                print("waiting", time_delta, "secs")
+                self.callback.on_waiting_for_next_poll(time_delta)
                 sleep(time_delta)
