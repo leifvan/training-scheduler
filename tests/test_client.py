@@ -9,6 +9,20 @@ from training_scheduler.client import SchedulingClient
 from training_scheduler.directory_adapters import LocalDirectoryAdapter
 
 
+class TestDifferentCallbacksInClient(unittest.TestCase):
+    def setUp(self) -> None:
+        os.makedirs("test_dir")
+
+    def tearDown(self) -> None:
+        shutil.rmtree("test_dir")
+
+    def test_if_client_can_be_created_with_None_as_callback(self):
+        self.sc = SchedulingClient(directory_adapter=LocalDirectoryAdapter("test_dir"),
+                                   callback=None, timeout=5)
+        self.sc.run()
+        self.assertTrue(True)
+
+
 class TestSchedulingClient(unittest.TestCase):
     def setUp(self) -> None:
         self.planned_run_dir = os.path.join("test_dir", "planned")

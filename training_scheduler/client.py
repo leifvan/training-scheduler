@@ -125,7 +125,7 @@ class SchedulingClient:
         self.directory = directory_adapter
         self.min_polling_interval = min_polling_interval
         self.timeout = timeout
-        self.callback = SchedulingClientCallback if callback is None else callback
+        self.callback = SchedulingClientCallback() if callback is None else callback
 
         self.config_consumers: Dict[Type, ConsumerCallbackType] = dict()
 
