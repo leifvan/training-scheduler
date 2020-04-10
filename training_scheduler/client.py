@@ -149,11 +149,36 @@ class SchedulingClient:
 
         self.config_consumers[config_class] = consumer_fn
 
-    def run(self, debug=False):
+    def _resume_active_configs(self):
+        # check for active configs
+        active_configs = self.directory.poll_directory(ConfigState.active)
+
+        if len(active_configs) > 0:
+            print("There",
+                  "is 1 config" if len(active_configs) == 1
+                  else f"are {len(active_configs)} configs",
+                  "marked as active:")
+
+            for identifier in active_configs:
+                print(" -", identifier)
+                self.directory.change_state(identifier, ConfigState.planned,
+                                            validate_change=False)
+
+            print("It was" if len(active_configs) == 1 else "They were", "moved back into the",
+                  "planned directory to be resumed.")
+
+    def run(self, debug=False, resume_active_configs=False) -> None:
         """
         Starts the execution loop of this instance. It will run until the script is aborted with
         an interrupt or an unexpected exception is thrown.
+        :param debug: If true, the run loop will re-raise all exceptions occurring during execution
+        of consumers (defaults to false).
+        :param resume_active_configs: If true, all configs found in the active directory are moved
+        back into the planned directory before starting the run loop (defaults to false).
         """
+
+        if resume_active_configs:
+            self._resume_active_configs()
 
         time_of_last_nonempty_poll = 0
 
@@ -180,7 +205,6 @@ class SchedulingClient:
                         self.directory.change_state(identifier, ConfigState.active)
 
                         # run consumer
-                        # TODO maybe the consumers should be run in a separate process to protect from memory leaks
                         try:
                             result = self.config_consumers[type(config)](config, identifier)
                             try:

@@ -26,7 +26,11 @@ class TestDifferentCallbacksInClient(unittest.TestCase):
 class TestSchedulingClient(unittest.TestCase):
     def setUp(self) -> None:
         self.planned_run_dir = os.path.join("test_dir", "planned")
+        self.active_run_dir = os.path.join("test_dir", "active")
+        self.completed_run_dir = os.path.join("test_dir", "completed")
         os.makedirs(self.planned_run_dir)
+        os.makedirs(self.active_run_dir)
+        os.makedirs(self.completed_run_dir)
 
         self.sc = SchedulingClient(directory_adapter=LocalDirectoryAdapter("test_dir"),
                                    timeout=5)
@@ -54,11 +58,9 @@ class TestSchedulingClient(unittest.TestCase):
             file.write(data)
 
         self.sc.run(debug=True)
-        self.assertTrue(os.path.isfile(os.path.join("test_dir",
-                                                    "completed",
+        self.assertTrue(os.path.isfile(os.path.join(self.completed_run_dir,
                                                     "test_config_empty.yaml")))
-        self.assertFalse(os.path.isfile(os.path.join("test_dir",
-                                                     "completed",
+        self.assertFalse(os.path.isfile(os.path.join(self.completed_run_dir,
                                                      "test_config_empty.yaml.out")))
 
     def test_client_parses_config_with_output(self):
@@ -81,12 +83,10 @@ class TestSchedulingClient(unittest.TestCase):
             file.write(data)
 
         self.sc.run(debug=True)
-        self.assertTrue(os.path.isfile(os.path.join("test_dir",
-                                                    "completed",
+        self.assertTrue(os.path.isfile(os.path.join(self.completed_run_dir,
                                                     "test_config_output.yaml")))
 
-        self.assertTrue(os.path.isfile(os.path.join("test_dir",
-                                                    "completed",
+        self.assertTrue(os.path.isfile(os.path.join(self.completed_run_dir,
                                                     "test_config_output.yaml.out")))
 
     def test_if_exception_is_reraised_in_debug_mode(self):
@@ -110,6 +110,31 @@ class TestSchedulingClient(unittest.TestCase):
 
         with self.assertRaises(expected_exception=Exception):
             self.sc.run(debug=True)
+
+    def test_if_active_configs_can_be_resumed(self):
+        @trainingconfig
+        @dataclass
+        class TestConfigEmpty:
+            test_string: Optional[str] = None
+
+        def consumer(config: TestConfigEmpty, identifier: str):
+            self.assertEqual(type(config), TestConfigEmpty)
+            print("run")
+            sleep(3)
+            print("end")
+
+        self.sc.register_config(config_class=TestConfigEmpty, consumer_fn=consumer)
+
+        data = "!trainingconfig/TestConfigEmpty\ntest_string: null\n"
+
+        with open(os.path.join(self.active_run_dir, 'test_config_empty.yaml'), 'w') as file:
+            file.write(data)
+
+        self.sc.run(debug=True, resume_active_configs=True)
+        self.assertTrue(os.path.isfile(os.path.join(self.completed_run_dir,
+                                                    "test_config_empty.yaml")))
+        self.assertFalse(os.path.isfile(os.path.join(self.completed_run_dir,
+                                                     "test_config_empty.yaml.out")))
 
 
 if __name__ == '__main__':
