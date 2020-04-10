@@ -23,6 +23,26 @@ class SchedulingClientCallback:
         """
         ...
 
+    def on_config_completed(self, identifier: str, config: ConfigType) -> None:
+        """
+            Fired when a config file was consumed returning None.
+            :param identifier: The identifier of the config.
+            :param config: The config object.
+            """
+
+    def on_config_failed(self, identifier: str, config: ConfigType, return_value: Any) -> None:
+        """
+        Fired when
+         - a config file was consumed returning something (which indicates a failure),
+         - an exception occurred in the consumer (also calls ``on_failed_to_run_config``) or
+         - an exception occurred while trying to write the return value of the consumer (also calls
+           ``on_failed_to_write_result``).
+
+        :param identifier: The identifier of the config.
+        :param config: The config object.
+        :param return_value: The value the consumer returned.
+        """
+
     def on_failed_to_write_result(self, identifier: str, config: ConfigType,
                                   results: Optional[dict], exception: Exception) -> None:
         """
@@ -82,6 +102,12 @@ class DefaultSchedulingClientCallback(SchedulingClientCallback):
 
     def on_config_loaded(self, identifier: str, config: ConfigType) -> None:
         print("loaded config:", config)
+
+    def on_config_completed(self, identifier: str, config: ConfigType) -> None:
+        print("completed config:", identifier)
+
+    def on_config_failed(self, identifier: str, config: ConfigType, return_value: Any) -> None:
+        print("consumer signals a failure in config:", identifier)
 
     def on_failed_to_write_result(self, identifier: str, config: ConfigType,
                                   results: Optional[dict], exception: Exception) -> None:
@@ -220,8 +246,10 @@ class SchedulingClient:
 
                         if result is None:  # implies consuming ran as expected
                             self.directory.change_state(identifier, ConfigState.completed)
+                            self.callback.on_config_completed(identifier, config)
                         else:  # something went wrong
                             self.directory.change_state(identifier, ConfigState.failed)
+                            self.callback.on_config_failed(identifier, config, result)
                             try:
                                 if result is not None:
                                     self.directory.write_output(identifier, json.dumps(result))
