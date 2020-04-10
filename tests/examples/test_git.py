@@ -17,6 +17,7 @@ class GitExampleTests(unittest.TestCase):
         shutil.rmtree("test_dir")
 
     def test_git_pull(self):
+        # TODO make this self-contained. Currently it does not work with tox because there is no git
         sc = SchedulingClient(directory_adapter=LocalDirectoryAdapter("test_dir"),
                               timeout=10)
         sc.register_config(GitPullConfig, git_pull_consumer)

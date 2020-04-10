@@ -1,9 +1,10 @@
 import json
 from time import sleep, time
 from typing import Dict, Type, Callable, Any, Optional
+
 from yamlable import YamlAble
+
 from .directory_adapters import DirectoryAdapter, ConfigState, ConfigType
-from abc import abstractmethod, ABC
 
 ConsumerCallbackType = Callable[[YamlAble, str], Any]
 
@@ -72,6 +73,7 @@ class SchedulingClientCallback:
         ...
 
 
+# noinspection PyMissingOrEmptyDocstring
 class DefaultSchedulingClientCallback(SchedulingClientCallback):
     """
     An exemplary implementation of ``SchedulingClientCallback`` that prints some debug info for each
@@ -180,7 +182,7 @@ class SchedulingClient:
         if resume_active_configs:
             self._resume_active_configs()
 
-        time_of_last_nonempty_poll = 0
+        time_of_last_nonempty_poll = 0.
 
         while True:
             # poll directory for new config files
@@ -201,27 +203,34 @@ class SchedulingClient:
 
                     # check if there is a consumer for this config
                     if config and type(config) in self.config_consumers:
+
                         # move config to active folder
                         self.directory.change_state(identifier, ConfigState.active)
 
                         # run consumer
+
                         try:
                             result = self.config_consumers[type(config)](config, identifier)
+                        except Exception as e:
+                            self.callback.on_failed_to_run_config(identifier, config, e)
+                            if debug: raise
+                            result = f"Failed to run config due to {e}."
+
+                        # bookkeeping and possible write of result
+
+                        if result is None:  # implies consuming ran as expected
+                            self.directory.change_state(identifier, ConfigState.completed)
+                        else:  # something went wrong
+                            self.directory.change_state(identifier, ConfigState.failed)
                             try:
                                 if result is not None:
                                     self.directory.write_output(identifier, json.dumps(result))
-
                             except Exception as e:
-                                self.callback.on_failed_to_write_result(identifier, config, result, e)
-                                if debug: raise e
+                                self.callback.on_failed_to_write_result(identifier, config,
+                                                                        result, e)
+                                if debug: raise
 
-                        except Exception as e:
-                            self.callback.on_failed_to_run_config(identifier, config, e)
-                            if debug: raise e
-
-                        # complete execution
-                        self.directory.change_state(identifier, ConfigState.completed)
-                    else:
+                    else:  # no consumer registered
                         self.callback.on_unregistered_config(identifier, config)
             else:
                 self.callback.on_no_configs_found()

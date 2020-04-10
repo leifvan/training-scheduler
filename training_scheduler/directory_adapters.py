@@ -1,13 +1,15 @@
 import os
 from abc import ABC, abstractmethod
-from typing import List, Union, Hashable, Generic, TypeVar, Type, Dict, Any
-import yaml
 from enum import Enum
+from typing import List, Union, Dict, Any
 
-ConfigState = Enum("ConfigState", "planned active completed")
+import yaml
+
+ConfigState = Enum("ConfigState", "planned active completed failed")
 ConfigType = Any
 _allowed_state_changes = ((ConfigState.planned, ConfigState.active),
-                          (ConfigState.active, ConfigState.completed))
+                          (ConfigState.active, ConfigState.completed),
+                          (ConfigState.active, ConfigState.failed))
 
 
 class DirectoryAdapter(ABC):
@@ -154,6 +156,6 @@ class LocalDirectoryAdapter(DirectoryAdapter):
                      self.directories[new_state])
 
     def write_output(self, identifier: str, output: str) -> None:
-        with open(os.path.join(self.directories[ConfigState.completed],
+        with open(os.path.join(self.directories[ConfigState.failed],
                                identifier + ".out"), 'a') as file:
             file.write(output)

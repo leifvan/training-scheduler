@@ -1,11 +1,12 @@
-import unittest
 import os
 import shutil
-from typing import Optional
-from time import sleep
+import unittest
 from dataclasses import dataclass
-from training_scheduler.config import trainingconfig
+from time import sleep
+from typing import Optional
+
 from training_scheduler.client import SchedulingClient
+from training_scheduler.config import trainingconfig
 from training_scheduler.directory_adapters import LocalDirectoryAdapter
 
 
@@ -28,6 +29,7 @@ class TestSchedulingClient(unittest.TestCase):
         self.planned_run_dir = os.path.join("test_dir", "planned")
         self.active_run_dir = os.path.join("test_dir", "active")
         self.completed_run_dir = os.path.join("test_dir", "completed")
+        self.failed_run_dir = os.path.join("test_dir", "failed")
         os.makedirs(self.planned_run_dir)
         os.makedirs(self.active_run_dir)
         os.makedirs(self.completed_run_dir)
@@ -83,11 +85,66 @@ class TestSchedulingClient(unittest.TestCase):
             file.write(data)
 
         self.sc.run(debug=True)
-        self.assertTrue(os.path.isfile(os.path.join(self.completed_run_dir,
+        self.assertTrue(os.path.isfile(os.path.join(self.failed_run_dir,
                                                     "test_config_output.yaml")))
 
-        self.assertTrue(os.path.isfile(os.path.join(self.completed_run_dir,
+        self.assertTrue(os.path.isfile(os.path.join(self.failed_run_dir,
                                                     "test_config_output.yaml.out")))
+
+    def test_client_writes_a_default_output_if_consumer_raises(self):
+        @trainingconfig
+        @dataclass
+        class TestConfigOutput:
+            test_string: Optional[str] = None
+
+        def consumer(config: TestConfigOutput, identifier: str):
+            print("run")
+            sleep(3)
+            print("end")
+            raise Exception("Pretending not to work.")
+
+        self.sc.register_config(config_class=TestConfigOutput, consumer_fn=consumer)
+
+        data = "!trainingconfig/TestConfigOutput\ntest_string: Some string for testing.\n"
+
+        with open(os.path.join(self.planned_run_dir, 'test_config_output.yaml'), 'w') as file:
+            file.write(data)
+
+        self.sc.run(debug=False)
+
+        self.assertTrue(os.path.isfile(os.path.join(self.failed_run_dir,
+                                                    "test_config_output.yaml")))
+
+        self.assertTrue(os.path.isfile(os.path.join(self.failed_run_dir,
+                                                    "test_config_output.yaml.out")))
+
+    def test_client_catches_errors_if_writing_output_fails(self):
+        @trainingconfig
+        @dataclass
+        class TestConfigOutput:
+            test_string: Optional[str] = None
+
+        def consumer(config: TestConfigOutput, identifier: str):
+            print("run")
+            sleep(3)
+            print("end")
+            # return something that cannot be parsed to json
+            return os
+
+        self.sc.register_config(config_class=TestConfigOutput, consumer_fn=consumer)
+
+        data = "!trainingconfig/TestConfigOutput\ntest_string: Some string for testing.\n"
+
+        with open(os.path.join(self.planned_run_dir, 'test_config_output.yaml'), 'w') as file:
+            file.write(data)
+
+        self.sc.run(debug=False)
+
+        self.assertTrue(os.path.isfile(os.path.join(self.failed_run_dir,
+                                                    "test_config_output.yaml")))
+
+        self.assertFalse(os.path.isfile(os.path.join(self.failed_run_dir,
+                                                     "test_config_output.yaml.out")))
 
     def test_if_exception_is_reraised_in_debug_mode(self):
         @trainingconfig
